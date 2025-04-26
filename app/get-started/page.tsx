@@ -2,17 +2,18 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { ShieldCheck } from "lucide-react"
+import { ShieldCheck, Eye, EyeOff, Check, X } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { FiberOpticBackground } from "@/components/fiber-optic-background"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { validatePassword } from "@/lib/password-validation"
 
 export default function GetStartedPage() {
   const [name, setName] = useState("")
@@ -21,11 +22,35 @@ export default function GetStartedPage() {
   const [plan, setPlan] = useState("standard")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [passwordStrength, setPasswordStrength] = useState({
+    score: 0,
+    feedback: { warning: "", suggestions: [] },
+    isStrong: false,
+  })
   const router = useRouter()
+
+  useEffect(() => {
+    if (password) {
+      setPasswordStrength(validatePassword(password))
+    } else {
+      setPasswordStrength({
+        score: 0,
+        feedback: { warning: "", suggestions: [] },
+        isStrong: false,
+      })
+    }
+  }, [password])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+
+    if (!passwordStrength.isStrong) {
+      setError("Please choose a stronger password")
+      return
+    }
+
     setIsLoading(true)
 
     try {
@@ -66,6 +91,13 @@ export default function GetStartedPage() {
       setError(error instanceof Error ? error.message : "An error occurred during registration")
       setIsLoading(false)
     }
+  }
+
+  const getScoreColor = (score: number) => {
+    if (score <= 1) return "bg-red-500"
+    if (score === 2) return "bg-orange-500"
+    if (score === 3) return "bg-yellow-500"
+    return "bg-green-500"
   }
 
   return (
@@ -116,13 +148,75 @@ export default function GetStartedPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+
+                {/* Password strength indicator */}
+                {password && (
+                  <div className="mt-2 space-y-2">
+                    <div className="flex gap-1 h-1.5">
+                      {[1, 2, 3, 4].map((index) => (
+                        <div
+                          key={index}
+                          className={`h-full flex-1 rounded-full ${
+                            passwordStrength.score >= index ? getScoreColor(passwordStrength.score) : "bg-gray-200"
+                          }`}
+                        />
+                      ))}
+                    </div>
+
+                    {passwordStrength.feedback.warning && (
+                      <p className="text-xs text-red-500">{passwordStrength.feedback.warning}</p>
+                    )}
+
+                    <ul className="space-y-1">
+                      <li
+                        className={`text-xs flex items-center gap-1 ${password.length >= 8 ? "text-green-500" : "text-gray-500"}`}
+                      >
+                        {password.length >= 8 ? <Check size={12} /> : <X size={12} />}
+                        At least 8 characters
+                      </li>
+                      <li
+                        className={`text-xs flex items-center gap-1 ${/[A-Z]/.test(password) ? "text-green-500" : "text-gray-500"}`}
+                      >
+                        {/[A-Z]/.test(password) ? <Check size={12} /> : <X size={12} />}
+                        At least one uppercase letter
+                      </li>
+                      <li
+                        className={`text-xs flex items-center gap-1 ${/[a-z]/.test(password) ? "text-green-500" : "text-gray-500"}`}
+                      >
+                        {/[a-z]/.test(password) ? <Check size={12} /> : <X size={12} />}
+                        At least one lowercase letter
+                      </li>
+                      <li
+                        className={`text-xs flex items-center gap-1 ${/\d/.test(password) ? "text-green-500" : "text-gray-500"}`}
+                      >
+                        {/\d/.test(password) ? <Check size={12} /> : <X size={12} />}
+                        At least one number
+                      </li>
+                      <li
+                        className={`text-xs flex items-center gap-1 ${/[!@#$%^&*(),.?":{}|<>]/.test(password) ? "text-green-500" : "text-gray-500"}`}
+                      >
+                        {/[!@#$%^&*(),.?":{}|<>]/.test(password) ? <Check size={12} /> : <X size={12} />}
+                        At least one special character
+                      </li>
+                    </ul>
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Select a Plan</Label>
@@ -147,7 +241,11 @@ export default function GetStartedPage() {
                   </div>
                 </RadioGroup>
               </div>
-              <Button type="submit" className="w-full bg-[#0A4DA6] hover:bg-[#0A4DA6]/90" disabled={isLoading}>
+              <Button
+                type="submit"
+                className="w-full bg-[#0A4DA6] hover:bg-[#0A4DA6]/90"
+                disabled={isLoading || !passwordStrength.isStrong}
+              >
                 {isLoading ? "Creating Account..." : "Create Account"}
               </Button>
             </form>
