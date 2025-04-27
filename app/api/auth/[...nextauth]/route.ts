@@ -76,7 +76,7 @@ const handler = NextAuth({
                 email: user.email,
                 name: user.name,
                 requiresTwoFactor: true,
-              } as any
+              }
             }
 
             // Verify TOTP code

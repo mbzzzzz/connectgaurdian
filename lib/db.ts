@@ -1,204 +1,246 @@
-import { neon } from "@neondatabase/serverless"
+import { PrismaClient } from "@prisma/client"
+import bcrypt from "bcryptjs"
+import crypto from "crypto"
 
-// Create a SQL client with the database URL
-export const sql = neon(process.env.DATABASE_URL!)
+// PrismaClient is attached to the `global` object in development to prevent
+// exhausting your database connection limit.
+const globalForPrisma = global as unknown as { prisma: PrismaClient }
 
-// User type definition based on our schema
-export type User = {
-  id: string
-  name: string | null
-  email: string
-  password: string | null
-  role: string
-  image: string | null
-  emailVerified: Date | null
-  createdAt: Date
-  updatedAt: Date
-  twoFactorEnabled: boolean
-  twoFactorSecret: string | null
-  failedLoginAttempts: number
-  lockedUntil: Date | null
-  passwordChangedAt: Date | null
-  resetPasswordToken: string | null
-  resetPasswordExpires: Date | null
-}
+export const prisma = globalForPrisma.prisma || new PrismaClient()
 
-// Profile type definition
-export type Profile = {
-  id: string
-  userId: string
-  address: string | null
-  phone: string | null
-  plan: string
-  createdAt: Date
-  updatedAt: Date
-}
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma
 
 // User functions
-export async function getUserByEmail(email: string): Promise<User | null> {
-  const [user] = await sql<User[]>`
-    SELECT * FROM "User" WHERE email = ${email} LIMIT 1
-  `
-  return user || null
+export async function getUserByEmail(email: string) {
+  try {
+    return await prisma.user.findUnique({
+      where: { email },
+    })
+  } catch (error) {
+    console.error("Error getting user by email:", error)
+    return null
+  }
 }
 
-export async function getUserById(id: string): Promise<User | null> {
-  const [user] = await sql<User[]>`
-    SELECT * FROM "User" WHERE id = ${id} LIMIT 1
-  `
-  return user || null
+export async function getUserById(id: string) {
+  try {
+    return await prisma.user.findUnique({
+      where: { id },
+    })
+  } catch (error) {
+    console.error("Error getting user by ID:", error)
+    return null
+  }
 }
 
-export async function getUserProfile(userId: string): Promise<Profile | null> {
-  const [profile] = await sql<Profile[]>`
-    SELECT * FROM "Profile" WHERE userId = ${userId} LIMIT 1
-  `
-  return profile || null
-}
-
-// Session functions
-export async function createSession(userId: string, expires: Date): Promise<string> {
-  const id = crypto.randomUUID()
-  const sessionToken = crypto.randomUUID()
-
-  await sql`
-    INSERT INTO "Session" (id, sessionToken, userId, expires)
-    VALUES (${id}, ${sessionToken}, ${userId}, ${expires})
-  `
-
-  return sessionToken
-}
-
-export async function getSessionByToken(sessionToken: string) {
-  const [session] = await sql`
-    SELECT * FROM "Session" WHERE sessionToken = ${sessionToken} LIMIT 1
-  `
-  return session
-}
-
-export async function deleteSession(sessionToken: string) {
-  await sql`
-    DELETE FROM "Session" WHERE sessionToken = ${sessionToken}
-  `
-}
-
-// Authentication functions
+// Login attempt tracking
 export async function recordLoginAttempt(email: string, ipAddress: string, userAgent: string | null, success: boolean) {
-  const id = crypto.randomUUID()
-
-  await sql`
-    INSERT INTO "LoginAttempt" (id, email, ipAddress, userAgent, success, createdAt)
-    VALUES (${id}, ${email}, ${ipAddress}, ${userAgent}, ${success}, CURRENT_TIMESTAMP)
-  `
+  try {
+    return await prisma.loginAttempt.create({
+      data: {
+        id: crypto.randomUUID(),
+        email,
+        ipAddress,
+        userAgent,
+        success,
+      },
+    })
+  } catch (error) {
+    console.error("Error recording login attempt:", error)
+    // Don't throw - this is non-critical functionality
+  }
 }
 
-export async function getRecentLoginAttempts(email: string, ipAddress: string, minutes = 15) {
-  const timeAgo = new Date(Date.now() - minutes * 60 * 1000)
-
-  return await sql`
-    SELECT * FROM "LoginAttempt" 
-    WHERE (email = ${email} OR ipAddress = ${ipAddress})
-    AND success = false
-    AND createdAt > ${timeAgo}
-    ORDER BY createdAt DESC
-  `
-}
-
+// Failed login attempts
 export async function incrementFailedLoginAttempts(userId: string) {
-  await sql`
-    UPDATE "User"
-    SET failedLoginAttempts = failedLoginAttempts + 1
-    WHERE id = ${userId}
-  `
+  try {
+    return await prisma.user.update({
+      where: { id: userId },
+      data: {
+        failedLoginAttempts: {
+          increment: 1,
+        },
+      },
+    })
+  } catch (error) {
+    console.error("Error incrementing failed login attempts:", error)
+    // Don't throw - we'll just continue
+  }
 }
 
 export async function resetFailedLoginAttempts(userId: string) {
-  await sql`
-    UPDATE "User"
-    SET failedLoginAttempts = 0
-    WHERE id = ${userId}
-  `
+  try {
+    return await prisma.user.update({
+      where: { id: userId },
+      data: {
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+      },
+    })
+  } catch (error) {
+    console.error("Error resetting failed login attempts:", error)
+    // Don't throw - we'll just continue
+  }
 }
 
-export async function lockAccount(userId: string, minutes = 30) {
-  const lockUntil = new Date(Date.now() + minutes * 60 * 1000)
-
-  await sql`
-    UPDATE "User"
-    SET lockedUntil = ${lockUntil}
-    WHERE id = ${userId}
-  `
+// Account locking
+export async function lockAccount(userId: string, minutes: number) {
+  try {
+    const lockedUntil = new Date(Date.now() + minutes * 60 * 1000)
+    return await prisma.user.update({
+      where: { id: userId },
+      data: {
+        lockedUntil,
+      },
+    })
+  } catch (error) {
+    console.error("Error locking account:", error)
+    // Don't throw - we'll just continue
+  }
 }
 
-export async function isAccountLocked(userId: string): Promise<boolean> {
-  const [user] = await sql<User[]>`
-    SELECT lockedUntil FROM "User" WHERE id = ${userId} LIMIT 1
-  `
+export async function isAccountLocked(userId: string) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { lockedUntil: true },
+    })
 
-  if (!user || !user.lockedUntil) return false
+    if (!user || !user.lockedUntil) {
+      return false
+    }
 
-  return new Date(user.lockedUntil) > new Date()
+    return new Date() < new Date(user.lockedUntil)
+  } catch (error) {
+    console.error("Error checking if account is locked:", error)
+    return false // Default to not locked if there's an error
+  }
 }
 
-export async function updateTwoFactorSecret(userId: string, secret: string | null) {
-  await sql`
-    UPDATE "User"
-    SET twoFactorSecret = ${secret}
-    WHERE id = ${userId}
-  `
+// Password reset
+export async function createPasswordResetToken(email: string) {
+  try {
+    const user = await getUserByEmail(email)
+    if (!user) return null
+
+    const resetToken = crypto.randomBytes(32).toString("hex")
+    const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex")
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        resetPasswordToken: hashedToken,
+        resetPasswordExpires: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+      },
+    })
+
+    return resetToken
+  } catch (error) {
+    console.error("Error creating password reset token:", error)
+    return null
+  }
+}
+
+export async function resetPassword(token: string, newPassword: string) {
+  try {
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex")
+
+    const user = await prisma.user.findFirst({
+      where: {
+        resetPasswordToken: hashedToken,
+        resetPasswordExpires: {
+          gt: new Date(),
+        },
+      },
+    })
+
+    if (!user) return false
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10)
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        resetPasswordToken: null,
+        resetPasswordExpires: null,
+        passwordChangedAt: new Date(),
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+      },
+    })
+
+    return true
+  } catch (error) {
+    console.error("Error resetting password:", error)
+    return false
+  }
+}
+
+// 2FA functions
+export async function updateTwoFactorSecret(userId: string, secret: string) {
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorSecret: secret,
+      },
+    })
+  } catch (error) {
+    console.error("Error updating two factor secret:", error)
+  }
 }
 
 export async function enableTwoFactor(userId: string) {
-  await sql`
-    UPDATE "User"
-    SET twoFactorEnabled = true
-    WHERE id = ${userId}
-  `
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorEnabled: true,
+        twoFactorSecret: null, // Clear the secret after enabling
+      },
+    })
+  } catch (error) {
+    console.error("Error enabling two factor auth:", error)
+  }
 }
 
 export async function disableTwoFactor(userId: string) {
-  await sql`
-    UPDATE "User"
-    SET twoFactorEnabled = false, twoFactorSecret = NULL
-    WHERE id = ${userId}
-  `
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorEnabled: false,
+        twoFactorSecret: null,
+      },
+    })
+  } catch (error) {
+    console.error("Error disabling two factor auth:", error)
+  }
 }
 
-export async function createPasswordResetToken(email: string): Promise<string | null> {
-  const user = await getUserByEmail(email)
+export async function validatePasswordResetToken(token: string) {
+  try {
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex")
 
-  if (!user) return null
+    const user = await prisma.user.findFirst({
+      where: {
+        resetPasswordToken: hashedToken,
+        resetPasswordExpires: {
+          gt: new Date(),
+        },
+      },
+    })
 
-  const token = crypto.randomUUID()
-  const expires = new Date(Date.now() + 3600 * 1000) // 1 hour
-
-  await sql`
-    UPDATE "User"
-    SET resetPasswordToken = ${token}, resetPasswordExpires = ${expires}
-    WHERE id = ${user.id}
-  `
-
-  return token
+    return user
+  } catch (error) {
+    console.error("Error validating password reset token:", error)
+    return null
+  }
 }
 
-export async function validatePasswordResetToken(token: string): Promise<User | null> {
-  const [user] = await sql<User[]>`
-    SELECT * FROM "User" 
-    WHERE resetPasswordToken = ${token} 
-    AND resetPasswordExpires > CURRENT_TIMESTAMP
-    LIMIT 1
-  `
+import postgres from "postgres"
 
-  return user || null
-}
+const DATABASE_URL = process.env.DATABASE_URL || ""
 
-export async function resetPassword(userId: string, newPassword: string) {
-  await sql`
-    UPDATE "User"
-    SET password = ${newPassword}, 
-        resetPasswordToken = NULL, 
-        resetPasswordExpires = NULL,
-        passwordChangedAt = CURRENT_TIMESTAMP
-    WHERE id = ${userId}
-  `
-}
+export const sql = postgres(DATABASE_URL)

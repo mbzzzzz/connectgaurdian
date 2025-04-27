@@ -60,10 +60,12 @@
     "zod": "^3.24.1",
     "@auth/core": "latest",
     "nodemailer": "latest",
+    "prisma": "latest",
     "next-auth": "latest",
-    "@neondatabase/serverless": "latest",
     "bcryptjs": "latest",
-    "crypto": "latest"
+    "crypto": "latest",
+    "@prisma/client": "latest",
+    "postgres": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

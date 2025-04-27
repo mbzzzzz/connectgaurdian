@@ -6,6 +6,7 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { ThemeProvider } from "@/components/theme-provider"
 import { SessionProvider } from "@/components/session-provider"
+import { ChatbotScript } from "@/components/chatbot-script"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -32,6 +33,7 @@ export default function RootLayout({
             </div>
           </ThemeProvider>
         </SessionProvider>
+        <ChatbotScript />
       </body>
     </html>
   )
