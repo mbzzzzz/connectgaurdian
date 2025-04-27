@@ -7,6 +7,7 @@ export function ChatbotScript() {
       <Script
         id="voiceflow-chatbot"
         strategy="afterInteractive"
+        type="text/javascript"
         dangerouslySetInnerHTML={{
           __html: `
             (function(d, t) {
@@ -19,10 +20,12 @@ export function ChatbotScript() {
                     voice: {
                       url: "https://runtime-api.voiceflow.com"
                     },
+                    // Position settings for bottom right corner
                     position: {
                       horizontal: 'right',
                       vertical: 'bottom'
                     },
+                    // Add some margin from the edges
                     spacing: {
                       horizontal: '20px',
                       vertical: '20px'
