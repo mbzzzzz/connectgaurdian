@@ -6,7 +6,7 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { ThemeProvider } from "@/components/theme-provider"
 import { SessionProvider } from "@/components/session-provider"
-import { ChatbotScript } from "@/components/chatbot-script"
+import { VoiceflowChat } from "@/components/voiceflow-chat"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -22,7 +22,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <SessionProvider>
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
@@ -33,7 +33,7 @@ export default function RootLayout({
             </div>
           </ThemeProvider>
         </SessionProvider>
-        <ChatbotScript />
+        <VoiceflowChat />
       </body>
     </html>
   )

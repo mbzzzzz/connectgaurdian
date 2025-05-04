@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
 import { sql } from "@/lib/db"
-import { validatePassword } from "@/lib/password-validation"
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,18 +10,6 @@ export async function POST(request: NextRequest) {
     // Validate input
     if (!name || !email || !password) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
-    }
-
-    // Validate password strength
-    const passwordStrength = validatePassword(password)
-    if (!passwordStrength.isStrong) {
-      return NextResponse.json(
-        {
-          error: "Password is too weak",
-          feedback: passwordStrength.feedback,
-        },
-        { status: 400 },
-      )
     }
 
     // Check if user already exists
@@ -43,28 +30,8 @@ export async function POST(request: NextRequest) {
 
     // Create user
     await sql`
-      INSERT INTO "User" (
-        id, 
-        name, 
-        email, 
-        password, 
-        role, 
-        twoFactorEnabled,
-        failedLoginAttempts,
-        createdAt, 
-        updatedAt
-      )
-      VALUES (
-        ${userId}, 
-        ${name}, 
-        ${email}, 
-        ${hashedPassword}, 
-        'user', 
-        false,
-        0,
-        CURRENT_TIMESTAMP, 
-        CURRENT_TIMESTAMP
-      )
+      INSERT INTO "User" (id, name, email, password, role, createdAt, updatedAt)
+      VALUES (${userId}, ${name}, ${email}, ${hashedPassword}, 'user', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `
 
     // Create profile

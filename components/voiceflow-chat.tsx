@@ -1,11 +1,11 @@
 "use client"
 import Script from "next/script"
 
-export function ChatbotScript() {
+export function VoiceflowChat() {
   return (
     <>
       <Script
-        id="voiceflow-chatbot"
+        id="voiceflow-chat-script"
         strategy="afterInteractive"
         type="text/javascript"
         dangerouslySetInnerHTML={{
@@ -14,21 +14,18 @@ export function ChatbotScript() {
                 var v = d.createElement(t), s = d.getElementsByTagName(t)[0];
                 v.onload = function() {
                   window.voiceflow.chat.load({
-                    verify: { projectID: '680d2021c1e2d8fd20436278' },
+                    verify: { projectID: '681645146675ec5c9d958b8c' },
                     url: 'https://general-runtime.voiceflow.com',
                     versionID: 'production',
                     voice: {
                       url: "https://runtime-api.voiceflow.com"
                     },
-                    // Position settings for bottom right corner
+                    // Position the chat bubble in the right bottom corner
                     position: {
                       horizontal: 'right',
-                      vertical: 'bottom'
-                    },
-                    // Add some margin from the edges
-                    spacing: {
-                      horizontal: '20px',
-                      vertical: '20px'
+                      vertical: 'bottom',
+                      offsetHorizontal: '20px',
+                      offsetVertical: '20px'
                     }
                   });
                 }

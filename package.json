@@ -62,8 +62,7 @@
     "nodemailer": "latest",
     "next-auth": "latest",
     "@neondatabase/serverless": "latest",
-    "bcryptjs": "latest",
-    "crypto": "latest"
+    "bcryptjs": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
