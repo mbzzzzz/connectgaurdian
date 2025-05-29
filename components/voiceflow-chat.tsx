@@ -14,7 +14,7 @@ export function VoiceflowChat() {
               var v = d.createElement(t), s = d.getElementsByTagName(t)[0];
               v.onload = function() {
                 window.voiceflow.chat.load({
-                  verify: { projectID: '682f36004833894b71e71395' },
+                  verify: { projectID: '6838d36bb662cf84105da7bb' },
                   url: 'https://general-runtime.voiceflow.com',
                   versionID: 'production',
                   voice: {
